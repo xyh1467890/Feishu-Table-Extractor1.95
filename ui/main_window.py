@@ -5,13 +5,18 @@ import webbrowser
 import subprocess
 
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QHBoxLayout, QFileDialog, QMessageBox,
-    QLineEdit
+    QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, 
+    QTabWidget, QFileDialog, QMessageBox, QLineEdit, QLabel, QFrame,
+    QStackedWidget, QPushButton
 )
+from ui.text_diff_dialog import TextDiffDialog
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 
 from ui.styles import APP_STYLE
-from ui.sidebar_panel import SidebarPanel, resource_path
+from ui.table_panel import TablePanel, resource_path
+from ui.simple_panel import SimplePanel
+from ui.permission_panel import PermissionPanel
 from ui.result_panel import ResultPanel
 from ui.search_logic import SearchLogic
 from workers.oauth_worker import OAuthTokenThread
@@ -22,23 +27,28 @@ from workers.fetch_worker import FetchDataThread
 class FeishuBitableApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("飞书多维表格元数据工具")
-        self.resize(1200, 900)
-        self.setMinimumSize(1000, 700)
+        self.setWindowTitle("飞书多维表格数据管理工具")
+        self.resize(1300, 850)
+        self.setMinimumSize(1100, 700)
         
+        self.current_module = "table"
         self.current_result = None
         self.original_json = ""
         self.oauth_thread = None
         self.get_cookie_thread = None
         
-        self.sidebar = None
+        self.module_nav = None
+        self.module_stack = None
+        self.table_panel = None
+        self.dashboard_panel = None
+        self.workflow_panel = None
+        self.permission_panel = None
         self.result_panel = None
         self.search_logic = None
         
         self.init_ui()
     
     def init_ui(self):
-        # 基础样式设置
         QApplication.instance().setStyle('Fusion')
         self.setStyleSheet(APP_STYLE)
         
@@ -46,48 +56,217 @@ class FeishuBitableApp(QMainWindow):
         central.setObjectName("central")
         self.setCentralWidget(central)
         
-        # 整体采用左右分栏布局
         main_layout = QHBoxLayout(central)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # 左侧控制面板
-        self.sidebar = SidebarPanel(self)
-        self.sidebar.tabs.currentChanged.connect(self.on_tab_changed)
-        main_layout.addWidget(self.sidebar)
+        left_sidebar = self.create_left_sidebar()
+        main_layout.addWidget(left_sidebar)
         
-        # 右侧结果面板
+        right_content = self.create_right_content()
+        main_layout.addWidget(right_content, 1)
+    
+    def create_left_sidebar(self):
+        sidebar = QWidget()
+        sidebar.setObjectName("left_sidebar")
+        sidebar.setFixedWidth(220)
+        
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        logo_container = QWidget()
+        logo_container.setObjectName("logo_container")
+        logo_container.setFixedHeight(72)
+        logo_layout = QVBoxLayout(logo_container)
+        logo_layout.setContentsMargins(24, 20, 24, 20)
+        logo_layout.setSpacing(8)
+        
+        app_title = QLabel("多维表格管理器")
+        app_title.setObjectName("app_title")
+        
+        
+        logo_layout.addWidget(app_title)
+        logo_layout.addStretch()
+        layout.addWidget(logo_container)
+        
+        nav_container = QWidget()
+        nav_container.setObjectName("nav_container")
+        nav_layout = QVBoxLayout(nav_container)
+        nav_layout.setContentsMargins(16, 0, 16, 16)
+        nav_layout.setSpacing(8)
+        
+        nav_label = QLabel("功能模块")
+        nav_label.setObjectName("nav_section_label")
+        nav_layout.addWidget(nav_label)
+        
+        self.module_nav = QWidget()
+        self.module_nav.setObjectName("module_nav")
+        module_layout = QVBoxLayout(self.module_nav)
+        module_layout.setContentsMargins(0, 0, 0, 0)
+        module_layout.setSpacing(6)
+        
+        self.create_nav_button(module_layout, "📊", "数据表", "table", True)
+        self.create_nav_button(module_layout, "📈", "仪表盘", "dashboard")
+        self.create_nav_button(module_layout, "🔄", "工作流", "workflow")
+        self.create_nav_button(module_layout, "🔐", "高级权限", "permission")
+        
+        module_layout.addStretch()
+        nav_layout.addWidget(self.module_nav)
+        
+        nav_layout.addStretch()
+        
+        help_container = QWidget()
+        help_container.setObjectName("help_container")
+        help_layout = QVBoxLayout(help_container)
+        help_layout.setContentsMargins(16, 16, 16, 24)
+        
+        help_title = QLabel("需要帮助？")
+        help_title.setObjectName("help_title")
+        
+        help_desc = QLabel('点击联系<a href="https://www.larkoffice.com/invitation/page/add_contact/?token=6e2ma113-ab71-48a6-a684-2c8bb2e38e32" style="text-decoration:none;color:#3b82f6;">作者</a>')
+        help_desc.setObjectName("help_desc")
+        help_desc.setOpenExternalLinks(True)
+        
+        help_layout.addWidget(help_title)
+        help_layout.addWidget(help_desc)
+        nav_layout.addWidget(help_container)
+        
+        layout.addWidget(nav_container, 1)
+        
+        return sidebar
+    
+    def create_nav_button(self, parent_layout, icon, text, module_id, is_selected=False):
+        btn = QLabel(f"{icon} {text}")
+        btn.setObjectName("nav_button")
+        btn.setProperty("module_id", module_id)
+        btn.setProperty("selected", is_selected)
+        btn.mousePressEvent = lambda e, m=module_id: self.on_module_clicked(m)
+        btn.setCursor(Qt.PointingHandCursor)
+        parent_layout.addWidget(btn)
+    
+    def on_module_clicked(self, module_id):
+        self.current_module = module_id
+        
+        for i in range(self.module_nav.layout().count()):
+            item = self.module_nav.layout().itemAt(i)
+            if item and item.widget():
+                widget = item.widget()
+                if widget.objectName() == "nav_button":
+                    is_current = widget.property("module_id") == module_id
+                    widget.setProperty("selected", is_current)
+                    widget.style().unpolish(widget)
+                    widget.style().polish(widget)
+                    widget.update()
+        
+        panel_index = {
+            "table": 0,
+            "dashboard": 1,
+            "workflow": 2,
+            "permission": 3
+        }.get(module_id, 0)
+        self.module_stack.setCurrentIndex(panel_index)
+        
+        module_titles = {
+            "table": "📊 数据表",
+            "dashboard": "📈 仪表盘",
+            "workflow": "🔄 工作流",
+            "permission": "🔐 高级权限"
+        }
+        self.module_title.setText(module_titles.get(module_id, "📊 数据表"))
+        
+        self.result_panel.result_text.clear()
+        self.current_result = None
+        self.result_panel.export_button.setEnabled(False)
+    
+    def create_right_content(self):
+        right_widget = QWidget()
+        right_widget.setObjectName("right_content")
+        
+        layout = QVBoxLayout(right_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        header_bar = QWidget()
+        header_bar.setObjectName("header_bar")
+        header_bar.setFixedHeight(72)
+        header_layout = QHBoxLayout(header_bar)
+        header_layout.setContentsMargins(24, 20, 24, 20)
+        header_layout.setSpacing(16)
+        
+        self.module_title = QLabel("📊 数据表")
+        self.module_title.setObjectName("module_title")
+        
+        header_layout.addWidget(self.module_title)
+        header_layout.addStretch()
+        
+        # 文本对比按钮
+        text_diff_btn = QPushButton("📄 文本对比")
+        text_diff_btn.setObjectName("secondary_btn")
+        text_diff_btn.setMinimumHeight(40)
+        text_diff_btn.setMinimumWidth(120)
+        text_diff_btn.clicked.connect(self.show_text_diff_dialog)
+        header_layout.addWidget(text_diff_btn)
+        
+        layout.addWidget(header_bar)
+        
+        content_area = QWidget()
+        content_layout = QHBoxLayout(content_area)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(1)
+        
+        left_panel_container = QWidget()
+        left_panel_container.setObjectName("left_panel_container")
+        left_panel_container.setFixedWidth(400)
+        
+        left_panel_layout = QVBoxLayout(left_panel_container)
+        left_panel_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.module_stack = QStackedWidget()
+        self.table_panel = TablePanel(self)
+        self.table_panel.tabs.currentChanged.connect(self.on_auth_tab_changed)
+        self.dashboard_panel = SimplePanel(self, "仪表盘")
+        self.workflow_panel = SimplePanel(self, "工作流")
+        self.permission_panel = PermissionPanel(self)
+        
+        self.module_stack.addWidget(self.table_panel)
+        self.module_stack.addWidget(self.dashboard_panel)
+        self.module_stack.addWidget(self.workflow_panel)
+        self.module_stack.addWidget(self.permission_panel)
+        
+        left_panel_layout.addWidget(self.module_stack)
+        content_layout.addWidget(left_panel_container)
+        
+        divider = QFrame()
+        divider.setFrameShape(QFrame.VLine)
+        divider.setObjectName("divider")
+        content_layout.addWidget(divider)
+        
         self.result_panel = ResultPanel(self)
-        main_layout.addWidget(self.result_panel)
+        content_layout.addWidget(self.result_panel, 1)
         
-        # 搜索逻辑
+        layout.addWidget(content_area, 1)
+        
         self.search_logic = SearchLogic(
             self.result_panel.result_text,
             self.result_panel.search_widget
         )
+        
+        return right_widget
     
-    def on_tab_changed(self, index):
-        """标签页切换时的处理"""
-        tab_text = self.sidebar.tabs.tabText(index)
-        if "Cookie" in tab_text:
-            # Cookie 标签页：弹框提示
-            QMessageBox.warning(
-                self,
-                "提示",
-                "注意：Cookie 方式仅可提取当前数据表 JSON 数据，无法批量提取全表 JSON，也不支持读取数据表内记录内容。"
-            )
-            self.sidebar.fetch_records_checkbox.setEnabled(False)
-            self.sidebar.fetch_records_checkbox.setChecked(False)
-            self.sidebar.fetch_records_checkbox.setToolTip("Cookie 方式不支持获取记录内容")
-        else:
-            self.sidebar.fetch_records_checkbox.setEnabled(True)
-            self.sidebar.fetch_records_checkbox.setChecked(True)
-            self.sidebar.fetch_records_checkbox.setToolTip("")
+    def get_current_panel(self):
+        if self.current_module == "table":
+            return self.table_panel
+        elif self.current_module == "dashboard":
+            return self.dashboard_panel
+        elif self.current_module == "workflow":
+            return self.workflow_panel
+        elif self.current_module == "permission":
+            return self.permission_panel
+        return None
     
     def on_manual_info_link_clicked(self, link):
-        """处理 Token 标签页链接点击"""
         if link == "help:token":
-            # 播放视频
             video_path = resource_path("get_user_access_token.mp4")
             if os.path.exists(video_path):
                 if sys.platform == "win32":
@@ -102,19 +281,24 @@ class FeishuBitableApp(QMainWindow):
             webbrowser.open(link)
     
     def toggle_token_visibility(self, checked):
+        current_panel = self.get_current_panel()
+        if not current_panel or not hasattr(current_panel, 'token_input'):
+            return
+        
         if checked:
-            self.sidebar.token_input.setEchoMode(QLineEdit.Normal)
-            self.sidebar.show_token_btn.setText("隐藏")
-            self.sidebar.show_token_btn.setStyleSheet("background-color: #409eff; color: white;")
+            current_panel.token_input.setEchoMode(QLineEdit.Normal)
+            current_panel.show_token_btn.setText("隐藏")
         else:
-            self.sidebar.token_input.setEchoMode(QLineEdit.Password)
-            self.sidebar.show_token_btn.setText("显示")
-            self.sidebar.show_token_btn.setStyleSheet("")
+            current_panel.token_input.setEchoMode(QLineEdit.Password)
+            current_panel.show_token_btn.setText("显示")
     
     def start_get_cookie(self):
-        """开始获取 Cookie"""
-        self.sidebar.get_cookie_btn.setEnabled(False)
-        self.sidebar.cookie_status_label.setText("正在准备...")
+        current_panel = self.get_current_panel()
+        if not current_panel:
+            return
+        
+        current_panel.get_cookie_btn.setEnabled(False)
+        current_panel.cookie_status_label.setText("正在准备...")
         
         self.get_cookie_thread = GetCookieThread()
         self.get_cookie_thread.cookie_received.connect(self.on_cookie_received)
@@ -123,35 +307,43 @@ class FeishuBitableApp(QMainWindow):
         self.get_cookie_thread.start()
     
     def confirm_get_cookie(self):
-        """确认登录完成，获取 Cookie"""
         if self.get_cookie_thread:
-            self.sidebar.confirm_login_btn.setEnabled(False)
+            current_panel = self.get_current_panel()
+            if current_panel:
+                current_panel.confirm_login_btn.setEnabled(False)
             self.get_cookie_thread.get_cookie_after_login()
     
     def update_cookie_status(self, message):
-        """更新 Cookie 状态"""
-        self.sidebar.cookie_status_label.setText(message)
-        if "请在浏览器中登录" in message:
-            self.sidebar.confirm_login_btn.setEnabled(True)
+        current_panel = self.get_current_panel()
+        if current_panel:
+            current_panel.cookie_status_label.setText(message)
+            if "请在浏览器中登录" in message:
+                current_panel.confirm_login_btn.setEnabled(True)
     
     def on_cookie_received(self, cookie):
-        """获取到 Cookie"""
-        self.sidebar.cookie_input.setText(cookie)
-        self.sidebar.cookie_status_label.setText("✓ Cookie 已自动填入")
-        self.sidebar.get_cookie_btn.setEnabled(True)
-        self.sidebar.confirm_login_btn.setEnabled(False)
+        current_panel = self.get_current_panel()
+        if current_panel:
+            current_panel.cookie_input.setText(cookie)
+            current_panel.cookie_status_label.setText("✓ Cookie 已自动填入")
+            current_panel.get_cookie_btn.setEnabled(True)
+            current_panel.confirm_login_btn.setEnabled(False)
         QMessageBox.information(self, "成功", "Cookie 获取成功，已自动填入！")
     
     def on_get_cookie_error(self, error_msg):
-        """获取 Cookie 出错"""
-        self.sidebar.cookie_status_label.setText(f"✗ 错误：{error_msg}")
-        self.sidebar.get_cookie_btn.setEnabled(True)
-        self.sidebar.confirm_login_btn.setEnabled(False)
+        current_panel = self.get_current_panel()
+        if current_panel:
+            current_panel.cookie_status_label.setText(f"✗ 错误：{error_msg}")
+            current_panel.get_cookie_btn.setEnabled(True)
+            current_panel.confirm_login_btn.setEnabled(False)
         QMessageBox.critical(self, "错误", error_msg)
     
     def start_oauth_flow(self):
-        app_id = self.sidebar.app_id_input.text().strip()
-        app_secret = self.sidebar.app_secret_input.text().strip()
+        current_panel = self.get_current_panel()
+        if not current_panel or not hasattr(current_panel, 'app_id_input'):
+            return
+        
+        app_id = current_panel.app_id_input.text().strip()
+        app_secret = current_panel.app_secret_input.text().strip()
         
         if not app_id:
             QMessageBox.warning(self, "提示", "请输入 App ID")
@@ -160,8 +352,8 @@ class FeishuBitableApp(QMainWindow):
             QMessageBox.warning(self, "提示", "请输入 App Secret")
             return
         
-        self.sidebar.login_button.setEnabled(False)
-        self.sidebar.oauth_status_label.setText("正在打开浏览器进行授权...")
+        current_panel.login_button.setEnabled(False)
+        current_panel.oauth_status_label.setText("正在打开浏览器进行授权...")
         
         self.oauth_thread = OAuthTokenThread(app_id, app_secret)
         self.oauth_thread.token_received.connect(self.on_token_received)
@@ -169,68 +361,250 @@ class FeishuBitableApp(QMainWindow):
         self.oauth_thread.start()
     
     def on_token_received(self, token):
-        self.sidebar.token_input.setText(token)
-        self.sidebar.oauth_status_label.setText("✓ 登录成功！Token 已自动填充")
-        self.sidebar.login_button.setEnabled(True)
-        QMessageBox.information(self, "成功", "登录成功！Token 已自动填充到输入框中。")
+        current_panel = self.get_current_panel()
+        if current_panel and hasattr(current_panel, 'token_input'):
+            current_panel.token_input.setText(token)
+            current_panel.oauth_status_label.setText("✓ 登录成功！")
+            current_panel.login_button.setEnabled(True)
+        QMessageBox.information(self, "成功", "登录成功！Token 已自动填充。")
     
     def on_oauth_error(self, error_msg):
-        self.sidebar.oauth_status_label.setText(f"✗ 错误：{error_msg}")
-        self.sidebar.login_button.setEnabled(True)
+        current_panel = self.get_current_panel()
+        if current_panel and hasattr(current_panel, 'oauth_status_label'):
+            current_panel.oauth_status_label.setText(f"✗ 错误：{error_msg}")
+            current_panel.login_button.setEnabled(True)
         QMessageBox.critical(self, "错误", error_msg)
     
     def fetch_data(self):
-        current_tab_index = self.sidebar.tabs.currentIndex()
-        feishu_url = self.sidebar.url_input.text().strip()
-        fetch_records = self.sidebar.fetch_records_checkbox.isChecked()
+        current_panel = self.get_current_panel()
+        if not current_panel:
+            return
         
-        auth_type = None
-        auth_data = None
-        
-        if current_tab_index == 0 or current_tab_index == 1:
-            # Token 或 OAuth 标签页
-            user_token = self.sidebar.token_input.text().strip()
-            if not user_token:
-                QMessageBox.warning(self, "提示", "请输入用户 Token")
-                return
-            auth_type = "token"
-            auth_data = user_token
-        elif current_tab_index == 2:
-            # Cookie 标签页
-            cookie = self.sidebar.cookie_input.text().strip()
-            if not cookie:
-                QMessageBox.warning(self, "提示", "请输入飞书 Cookie")
-                return
-            auth_type = "cookie"
-            auth_data = cookie
+        feishu_url = current_panel.url_input.text().strip()
         
         if not feishu_url:
             QMessageBox.warning(self, "提示", "请输入多维表格链接")
             return
         
-        self.sidebar.fetch_button.setEnabled(False)
+        current_panel.fetch_button.setEnabled(False)
         self.result_panel.export_button.setEnabled(False)
         self.result_panel.result_text.clear()
-        self.sidebar.progress_label.setStyleSheet("color: #409eff;")
+        current_panel.progress_label.setStyleSheet("color: #409eff;")
         
-        self.thread = FetchDataThread(auth_type, auth_data, feishu_url, fetch_records)
-        self.thread.progress.connect(self.update_progress)
-        self.thread.finished.connect(self.on_fetch_finished)
-        self.thread.error.connect(self.on_fetch_error)
-        self.thread.start()
+        # 根据当前模块处理不同类型
+        if self.current_module == "table":
+            # 数据表 - 使用现有的 FetchDataThread
+            auth_type = None
+            auth_data = None
+            
+            tab_index = current_panel.tabs.currentIndex()
+            if tab_index == 0 or tab_index == 1:
+                if not hasattr(current_panel, 'token_input'):
+                    QMessageBox.warning(self, "提示", "未找到 Token 输入框")
+                    current_panel.fetch_button.setEnabled(True)
+                    return
+                user_token = current_panel.token_input.text().strip()
+                if not user_token:
+                    QMessageBox.warning(self, "提示", "请输入用户 Token")
+                    current_panel.fetch_button.setEnabled(True)
+                    return
+                auth_type = "token"
+                auth_data = user_token
+            elif tab_index == 2:
+                if not hasattr(current_panel, 'cookie_input'):
+                    QMessageBox.warning(self, "提示", "未找到 Cookie 输入框")
+                    current_panel.fetch_button.setEnabled(True)
+                    return
+                cookie = current_panel.cookie_input.text().strip()
+                if not cookie:
+                    QMessageBox.warning(self, "提示", "请输入飞书 Cookie")
+                    current_panel.fetch_button.setEnabled(True)
+                    return
+                auth_type = "cookie"
+                auth_data = cookie
+            
+            fetch_records = current_panel.fetch_records_checkbox.isChecked() if hasattr(current_panel, 'fetch_records_checkbox') else False
+            
+            self.thread = FetchDataThread(auth_type, auth_data, feishu_url, fetch_records)
+            self.thread.progress.connect(lambda msg: current_panel.progress_label.setText(msg))
+            self.thread.finished.connect(self.on_fetch_finished)
+            self.thread.error.connect(lambda err: self.on_fetch_error(err, current_panel))
+            self.thread.start()
+        
+        elif self.current_module == "workflow":
+            # 工作流 - 使用新的 API
+            cookie = current_panel.cookie_input.text().strip()
+            if not cookie:
+                QMessageBox.warning(self, "提示", "请输入飞书 Cookie")
+                current_panel.fetch_button.setEnabled(True)
+                return
+            
+            current_panel.progress_label.setText("正在提取工作流...")
+            
+            # 创建工作流线程
+            from PyQt5.QtCore import QThread, pyqtSignal
+            
+            class WorkflowFetchThread(QThread):
+                progress = pyqtSignal(str)
+                finished = pyqtSignal(object)
+                error = pyqtSignal(str)
+                
+                def __init__(self, url, cookie):
+                    super().__init__()
+                    self.url = url
+                    self.cookie = cookie
+                
+                def run(self):
+                    try:
+                        # 延迟导入避免循环依赖
+                        from api.feishu_workflow_api import extract_workflow_info
+                        self.progress.emit("正在获取工作流配置...")
+                        result = extract_workflow_info(self.url, self.cookie)
+                        self.finished.emit(result)
+                    except Exception as e:
+                        self.error.emit(str(e))
+            
+            self.workflow_thread = WorkflowFetchThread(feishu_url, cookie)
+            self.workflow_thread.progress.connect(lambda msg: current_panel.progress_label.setText(msg))
+            self.workflow_thread.finished.connect(lambda r: self.on_workflow_fetch_finished(r, current_panel))
+            self.workflow_thread.error.connect(lambda err: self.on_fetch_error(err, current_panel))
+            self.workflow_thread.start()
+        
+        elif self.current_module == "dashboard":
+            # 仪表盘
+            cookie = current_panel.cookie_input.text().strip()
+            if not cookie:
+                QMessageBox.warning(self, "提示", "请输入飞书 Cookie")
+                current_panel.fetch_button.setEnabled(True)
+                return
+            
+            current_panel.progress_label.setText("正在获取仪表盘数据...")
+            
+            from PyQt5.QtCore import QThread, pyqtSignal
+            
+            class DashboardFetchThread(QThread):
+                progress = pyqtSignal(str)
+                finished = pyqtSignal(object)
+                error = pyqtSignal(str)
+                
+                def __init__(self, url, cookie):
+                    super().__init__()
+                    self.url = url
+                    self.cookie = cookie
+                
+                def run(self):
+                    try:
+                        from api.feishu_dashboard_api import extract_dashboard_info
+                        self.progress.emit("正在获取仪表盘配置...")
+                        result = extract_dashboard_info(self.url, self.cookie)
+                        self.finished.emit(result)
+                    except Exception as e:
+                        self.error.emit(str(e))
+            
+            self.dashboard_thread = DashboardFetchThread(feishu_url, cookie)
+            self.dashboard_thread.progress.connect(lambda msg: current_panel.progress_label.setText(msg))
+            self.dashboard_thread.finished.connect(lambda r: self.on_dashboard_fetch_finished(r, current_panel))
+            self.dashboard_thread.error.connect(lambda err: self.on_fetch_error(err, current_panel))
+            self.dashboard_thread.start()
+        
+        elif self.current_module == "permission":
+            # 高级权限
+            tab_index = current_panel.tabs.currentIndex()
+            if not hasattr(current_panel, 'token_input'):
+                QMessageBox.warning(self, "提示", "未找到 Token 输入框")
+                current_panel.fetch_button.setEnabled(True)
+                return
+            
+            user_token = current_panel.token_input.text().strip()
+            if not user_token:
+                QMessageBox.warning(self, "提示", "请输入用户 Token")
+                current_panel.fetch_button.setEnabled(True)
+                return
+            
+            current_panel.progress_label.setText("正在获取高级权限...")
+            
+            # 创建权限获取线程
+            from PyQt5.QtCore import QThread, pyqtSignal
+            
+            class PermissionFetchThread(QThread):
+                progress = pyqtSignal(str)
+                finished = pyqtSignal(object)
+                error = pyqtSignal(str)
+                
+                def __init__(self, url, token):
+                    super().__init__()
+                    self.url = url
+                    self.token = token
+                
+                def run(self):
+                    try:
+                        # 延迟导入避免循环依赖
+                        from api.feishu_permission_api import extract_permission_info
+                        self.progress.emit("正在获取权限配置...")
+                        result = extract_permission_info(self.url, self.token)
+                        self.finished.emit(result)
+                    except Exception as e:
+                        self.error.emit(str(e))
+            
+            self.permission_thread = PermissionFetchThread(feishu_url, user_token)
+            self.permission_thread.progress.connect(lambda msg: current_panel.progress_label.setText(msg))
+            self.permission_thread.finished.connect(lambda r: self.on_permission_fetch_finished(r, current_panel))
+            self.permission_thread.error.connect(lambda err: self.on_fetch_error(err, current_panel))
+            self.permission_thread.start()
     
-    def update_progress(self, message):
-        self.sidebar.progress_label.setText(message)
-    
-    def on_fetch_finished(self, result):
+    def on_workflow_fetch_finished(self, result, current_panel):
+        """工作流提取完成处理"""
         self.current_result = result
         self.original_json = json.dumps(result, ensure_ascii=False, indent=2)
         self.result_panel.result_text.setText(self.original_json)
         self.search_logic.set_original_text(self.original_json)
         self.result_panel.export_button.setEnabled(True)
-        self.sidebar.fetch_button.setEnabled(True)
-        self.sidebar.progress_label.setStyleSheet("color: #67c23a;")
-        self.sidebar.progress_label.setText("✓ 获取成功！")
+        current_panel.fetch_button.setEnabled(True)
+        current_panel.progress_label.setStyleSheet("color: #27ae60;")
+        current_panel.progress_label.setText("✓ 获取成功！")
+    
+    def on_dashboard_fetch_finished(self, result, current_panel):
+        """仪表盘提取完成处理"""
+        self.current_result = result
+        self.original_json = json.dumps(result, ensure_ascii=False, indent=2)
+        self.result_panel.result_text.setText(self.original_json)
+        self.search_logic.set_original_text(self.original_json)
+        self.result_panel.export_button.setEnabled(True)
+        current_panel.fetch_button.setEnabled(True)
+        current_panel.progress_label.setStyleSheet("color: #27ae60;")
+        current_panel.progress_label.setText("✓ 获取成功！")
+    
+    def on_permission_fetch_finished(self, result, current_panel):
+        """高级权限提取完成处理"""
+        self.current_result = result
+        self.original_json = json.dumps(result, ensure_ascii=False, indent=2)
+        self.result_panel.result_text.setText(self.original_json)
+        self.search_logic.set_original_text(self.original_json)
+        self.result_panel.export_button.setEnabled(True)
+        current_panel.fetch_button.setEnabled(True)
+        current_panel.progress_label.setStyleSheet("color: #27ae60;")
+        current_panel.progress_label.setText("✓ 获取成功！")
+    
+    def on_fetch_finished(self, result):
+        current_panel = self.get_current_panel()
+        if not current_panel:
+            return
+        
+        self.current_result = result
+        self.original_json = json.dumps(result, ensure_ascii=False, indent=2)
+        self.result_panel.result_text.setText(self.original_json)
+        self.search_logic.set_original_text(self.original_json)
+        self.result_panel.export_button.setEnabled(True)
+        current_panel.fetch_button.setEnabled(True)
+        current_panel.progress_label.setStyleSheet("color: #27ae60;")
+        current_panel.progress_label.setText("✓ 获取成功！")
+    
+    def on_fetch_error(self, error_msg, current_panel):
+        self.result_panel.result_text.setText(f"错误：{error_msg}")
+        current_panel.fetch_button.setEnabled(True)
+        current_panel.progress_label.setStyleSheet("color: #e74c3c;")
+        current_panel.progress_label.setText("✗ 获取失败")
+        QMessageBox.critical(self, "错误", f"获取数据失败：{error_msg}")
     
     def on_search_text_changed(self, search_text):
         self.search_logic.on_search_text_changed(search_text)
@@ -241,13 +615,25 @@ class FeishuBitableApp(QMainWindow):
     def on_next_match(self):
         self.search_logic.on_next_match()
     
-    def on_fetch_error(self, error_msg):
-        self.result_panel.result_text.setText(f"错误：{error_msg}")
-        self.sidebar.fetch_button.setEnabled(True)
-        self.sidebar.progress_label.setStyleSheet("color: #f56c6c;")
-        self.sidebar.progress_label.setText("✗ 获取失败")
-        QMessageBox.critical(self, "错误", f"获取数据失败：{error_msg}")
-    
+    def on_auth_tab_changed(self, index):
+        from PyQt5.QtWidgets import QMessageBox
+        # index 0: Token, 1: OAuth, 2: Cookie
+        if index == 2 and self.table_panel:
+            # Cookie tab selected
+            QMessageBox.information(
+                self,
+                "提示",
+                "该方法仅支持提取当前数据表的 JSON 数据，不支持获取全部飞书多维表格的元数据。",
+                QMessageBox.Ok
+            )
+            # Disable fetch records checkbox
+            if self.table_panel.fetch_records_checkbox:
+                self.table_panel.fetch_records_checkbox.setEnabled(False)
+                self.table_panel.fetch_records_checkbox.setChecked(False)
+        elif self.table_panel and self.table_panel.fetch_records_checkbox:
+            # Enable fetch records checkbox for other tabs
+            self.table_panel.fetch_records_checkbox.setEnabled(True)
+
     def export_json(self):
         if not self.current_result:
             return
@@ -266,3 +652,13 @@ class FeishuBitableApp(QMainWindow):
                 QMessageBox.information(self, "成功", f"文件已保存到：{file_path}")
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"保存文件失败：{str(e)}")
+    
+    def show_text_diff_dialog(self):
+        """显示文本对比对话框"""
+        # 检查是否已经有对话框存在
+        if not hasattr(self, 'text_diff_dialog') or not self.text_diff_dialog:
+            # 不传入parent，让它成为独立窗口
+            self.text_diff_dialog = TextDiffDialog()
+        self.text_diff_dialog.show()
+        self.text_diff_dialog.raise_()
+        self.text_diff_dialog.activateWindow()
