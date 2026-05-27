@@ -1,4 +1,16 @@
 from PyQt5.QtCore import QThread, pyqtSignal
+import os
+import tempfile
+
+# 顶部导入供PyInstaller分析依赖
+try:
+    from selenium import webdriver
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.chrome.options import Options
+    from webdriver_manager.chrome import ChromeDriverManager
+    _selenium_available = True
+except ImportError:
+    _selenium_available = False
 
 
 class GetCookieThread(QThread):
@@ -11,23 +23,38 @@ class GetCookieThread(QThread):
 
     def run(self):
         try:
-            self.progress.emit("正在启动浏览器...")
-            
-            # 导入 selenium 相关库
+            # 运行时再次导入，确保正确
             from selenium import webdriver
             from selenium.webdriver.chrome.service import Service
             from selenium.webdriver.chrome.options import Options
             from webdriver_manager.chrome import ChromeDriverManager
+            
+            self.progress.emit("正在启动浏览器...")
             
             chrome_options = Options()
             chrome_options.add_argument('--start-maximized')
             chrome_options.add_experimental_option("detach", True)
             
             self.progress.emit("正在打开飞书网页...")
-            driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
-                options=chrome_options
-            )
+            
+            # 尝试多种方案启动浏览器
+            driver = None
+            try:
+                # 方案1: 使用 webdriver-manager
+                driver = webdriver.Chrome(
+                    service=Service(ChromeDriverManager().install()),
+                    options=chrome_options
+                )
+            except Exception as e1:
+                try:
+                    # 方案2: 直接启动，可能使用系统中的 ChromeDriver
+                    self.progress.emit("尝试备用方案1...")
+                    driver = webdriver.Chrome(options=chrome_options)
+                except Exception as e2:
+                    # 方案3: 提示用户手动处理
+                    error_msg = f"无法启动浏览器。请尝试：\n1. 关闭所有 Chrome 窗口\n2. 删除文件夹: C:\\Users\\{os.environ.get('USERNAME', '')}\\.wdm\n3. 重新运行程序\n\n错误: {str(e1)}"
+                    self.error.emit(error_msg)
+                    return
             
             driver.get("https://www.feishu.cn/")
             
@@ -38,7 +65,6 @@ class GetCookieThread(QThread):
             self.driver = driver
             
             # 等待用户登录（这里我们不阻塞，让主程序处理）
-            # 实际上，我们需要一个更好的方式来等待用户登录
             
         except ImportError:
             self.error.emit("缺少必要的库，请先运行: pip install selenium webdriver-manager")

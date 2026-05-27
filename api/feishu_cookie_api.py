@@ -230,7 +230,10 @@ def get_tables_via_cookie(cookie, base_id, host, table_id=None):
         print(f"   响应 code: {resp_json.get('code')}")
         
         if resp_json.get("code") != 0:
-            raise ValueError(f"tablesv3 返回错误: {resp_json.get('msg')}")
+            msg = resp_json.get('msg')
+            if "log in again" in msg or "login" in msg.lower():
+                raise ValueError(f"Cookie 已过期，请重新获取 Cookie：{msg}")
+            raise ValueError(f"tablesv3 返回错误: {msg}")
         
         data = resp_json.get("data", {})
         print(f"   data 键数: {len(data) if data else 0}")
@@ -329,7 +332,10 @@ def get_fields_via_tablesv3(cookie, base_id, table_id, host):
         
         resp_json = response.json()
         if resp_json.get("code") != 0:
-            raise ValueError(f"tablesv3 返回错误: {resp_json.get('msg')}")
+            msg = resp_json.get('msg')
+            if "log in again" in msg or "login" in msg.lower():
+                raise ValueError(f"Cookie 已过期，请重新获取 Cookie：{msg}")
+            raise ValueError(f"tablesv3 返回错误: {msg}")
         
         data = resp_json.get("data", {})
         print(f"   Data 表数: {len(data)}")
