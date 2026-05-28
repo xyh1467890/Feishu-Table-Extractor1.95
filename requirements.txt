@@ -1,5 +1,12 @@
+# 基础依赖
 requests
 PyQt5
 selenium
 webdriver-manager
 pyinstaller>=6.0.0
+
+# LangGraph 评测模块依赖
+langgraph==0.2.45
+langchain==0.3.14
+langchain-ark==0.1.5
+langchain-openai==0.2.13
