@@ -1,14 +1,18 @@
+"""
+数据表面板
+"""
 import sys
 import os
 import webbrowser
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QTabWidget, QFrame, QCheckBox
+    QTabWidget, QFrame, QCheckBox, QMessageBox
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
 from config.settings import REDIRECT_PORT
+from ui.batch_dialog import BatchExtractDialog
 
 
 def resource_path(relative_path):
@@ -236,14 +240,52 @@ class TablePanel(QWidget):
         
         layout.addStretch()
         
-        # Action Button
+        # Action Buttons
+        btn_layout = QHBoxLayout()
+        
         self.fetch_button = QPushButton("获取数据")
         self.fetch_button.setObjectName("primary_btn")
         self.fetch_button.setCursor(Qt.PointingHandCursor)
+        self.fetch_button.setMinimumWidth(120)
         self.fetch_button.clicked.connect(self.parent_window.fetch_data if self.parent_window else lambda: None)
-        layout.addWidget(self.fetch_button)
+        
+        self.batch_button = QPushButton("📦 批量提取")
+        self.batch_button.setObjectName("secondary_btn")
+        self.batch_button.setCursor(Qt.PointingHandCursor)
+        self.batch_button.setMinimumWidth(120)
+        self.batch_button.clicked.connect(self.open_batch_dialog)
+        
+        btn_layout.addWidget(self.fetch_button)
+        btn_layout.addWidget(self.batch_button)
+        layout.addLayout(btn_layout)
         
         self.progress_label = QLabel("")
         self.progress_label.setAlignment(Qt.AlignCenter)
         self.progress_label.setStyleSheet("color: #67c23a; font-size: 13px; font-weight: bold; margin-top: 5px;")
         layout.addWidget(self.progress_label)
+    
+    def open_batch_dialog(self):
+        """打开批量提取对话框"""
+        # 获取当前认证信息
+        auth_type = ""
+        auth_data = ""
+        
+        tab_index = self.tabs.currentIndex()
+        if tab_index == 0 or tab_index == 1:  # Token或OAuth
+            auth_type = "token"
+            auth_data = self.token_input.text().strip()
+            if not auth_data:
+                from PyQt5.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "提示", "请先配置Token")
+                return
+        elif tab_index == 2:  # Cookie
+            auth_type = "cookie"
+            auth_data = self.cookie_input.text().strip()
+            if not auth_data:
+                from PyQt5.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "提示", "请先配置Cookie")
+                return
+        
+        # 打开对话框
+        dialog = BatchExtractDialog(auth_type, auth_data, "table", self)
+        dialog.exec_()

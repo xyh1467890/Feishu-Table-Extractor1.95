@@ -3,14 +3,8 @@ import os
 import tempfile
 
 # 顶部导入供PyInstaller分析依赖
-try:
-    from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.chrome.options import Options
-    from webdriver_manager.chrome import ChromeDriverManager
-    _selenium_available = True
-except ImportError:
-    _selenium_available = False
+# 移除严格的导入检查，允许运行时动态导入
+_selenium_available = True
 
 
 class GetCookieThread(QThread):
@@ -66,8 +60,8 @@ class GetCookieThread(QThread):
             
             # 等待用户登录（这里我们不阻塞，让主程序处理）
             
-        except ImportError:
-            self.error.emit("缺少必要的库，请先运行: pip install selenium webdriver-manager")
+        except ImportError as e:
+            self.error.emit(f"缺少必要的库，错误详情: {str(e)}\n请确保已安装 selenium 和 webdriver-manager")
         except Exception as e:
             self.error.emit(f"启动浏览器失败: {str(e)}")
     

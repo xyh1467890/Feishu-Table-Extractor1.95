@@ -17,13 +17,11 @@ from ui.styles import APP_STYLE
 from ui.table_panel import TablePanel, resource_path
 from ui.simple_panel import SimplePanel
 from ui.permission_panel import PermissionPanel
-from ui.query_verify_panel import QueryVerifyPanel
 from ui.result_panel import ResultPanel
 from ui.search_logic import SearchLogic
 from workers.oauth_worker import OAuthTokenThread
 from workers.cookie_worker import GetCookieThread
 from workers.fetch_worker import FetchDataThread
-from workers.query_verify_worker import QueryVerifyWorker
 
 
 class FeishuBitableApp(QMainWindow):
@@ -46,7 +44,6 @@ class FeishuBitableApp(QMainWindow):
         self.workflow_panel = None
         self.permission_panel = None
         self.form_panel = None
-        self.query_verify_panel = None
         self.result_panel = None
         self.search_logic = None
         
@@ -115,7 +112,6 @@ class FeishuBitableApp(QMainWindow):
         self.create_nav_button(module_layout, "🔄", "工作流", "workflow")
         self.create_nav_button(module_layout, "🔐", "高级权限", "permission")
         self.create_nav_button(module_layout, "📝", "表单", "form")
-        self.create_nav_button(module_layout, "🔍", "Query 合理性", "query_verify")
         
         module_layout.addStretch()
         nav_layout.addWidget(self.module_nav)
@@ -170,28 +166,22 @@ class FeishuBitableApp(QMainWindow):
             "dashboard": "📈 仪表盘",
             "workflow": "🔄 工作流",
             "permission": "🔐 高级权限",
-            "form": "📝 表单",
-            "query_verify": "🔍 Query 合理性"
+            "form": "📝 表单"
         }
         self.module_title.setText(module_titles.get(module_id, "📊 数据表"))
         
-        # 如果是查询验证模块，显示特殊布局
-        if module_id == "query_verify":
-            self.content_stack.setCurrentIndex(1)
-        else:
-            self.content_stack.setCurrentIndex(0)
-            # 更新普通模块的面板
-            panel_index = {
-                "table": 0,
-                "dashboard": 1,
-                "workflow": 2,
-                "permission": 3,
-                "form": 4
-            }.get(module_id, 0)
-            self.module_stack.setCurrentIndex(panel_index)
-            self.result_panel.result_text.clear()
-            self.current_result = None
-            self.result_panel.export_button.setEnabled(False)
+        # 更新模块面板
+        panel_index = {
+            "table": 0,
+            "dashboard": 1,
+            "workflow": 2,
+            "permission": 3,
+            "form": 4
+        }.get(module_id, 0)
+        self.module_stack.setCurrentIndex(panel_index)
+        self.result_panel.result_text.clear()
+        self.current_result = None
+        self.result_panel.export_button.setEnabled(False)
     
     def create_right_content(self):
         right_widget = QWidget()
@@ -224,14 +214,11 @@ class FeishuBitableApp(QMainWindow):
         
         layout.addWidget(header_bar)
         
-        # 内容区域使用 QStackedWidget，可以在普通布局和查询验证布局之间切换
-        self.content_stack = QStackedWidget()
-        
-        # 普通布局（左面板 + 结果面板）
-        normal_content = QWidget()
-        normal_layout = QHBoxLayout(normal_content)
-        normal_layout.setContentsMargins(0, 0, 0, 0)
-        normal_layout.setSpacing(1)
+        # 内容区域（左面板 + 结果面板）
+        content_widget = QWidget()
+        content_layout = QHBoxLayout(content_widget)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(1)
         
         left_panel_container = QWidget()
         left_panel_container.setObjectName("left_panel_container")
@@ -247,7 +234,6 @@ class FeishuBitableApp(QMainWindow):
         self.workflow_panel = SimplePanel(self, "工作流")
         self.permission_panel = PermissionPanel(self)
         self.form_panel = SimplePanel(self, "表单")
-        self.query_verify_panel = QueryVerifyPanel(self)
         
         self.module_stack.addWidget(self.table_panel)
         self.module_stack.addWidget(self.dashboard_panel)
@@ -256,21 +242,17 @@ class FeishuBitableApp(QMainWindow):
         self.module_stack.addWidget(self.form_panel)
         
         left_panel_layout.addWidget(self.module_stack)
-        normal_layout.addWidget(left_panel_container)
+        content_layout.addWidget(left_panel_container)
         
         divider = QFrame()
         divider.setFrameShape(QFrame.VLine)
         divider.setObjectName("divider")
-        normal_layout.addWidget(divider)
+        content_layout.addWidget(divider)
         
         self.result_panel = ResultPanel(self)
-        normal_layout.addWidget(self.result_panel, 1)
+        content_layout.addWidget(self.result_panel, 1)
         
-        # 添加两种布局到 stack
-        self.content_stack.addWidget(normal_content)
-        self.content_stack.addWidget(self.query_verify_panel)
-        
-        layout.addWidget(self.content_stack, 1)
+        layout.addWidget(content_widget, 1)
         
         self.search_logic = SearchLogic(
             self.result_panel.result_text,
@@ -290,83 +272,7 @@ class FeishuBitableApp(QMainWindow):
             return self.permission_panel
         elif self.current_module == "form":
             return self.form_panel
-        elif self.current_module == "query_verify":
-            return self.query_verify_panel
         return None
-    
-    def verify_query(self):
-        """执行 Query 评测"""
-        panel = self.query_verify_panel
-        if not panel:
-            return
-        
-        api_key = panel.get_api_key()
-        if not api_key:
-            QMessageBox.warning(self, "提示", "请输入 API Key")
-            return
-        
-        query = panel.get_query()
-        if not query:
-            QMessageBox.warning(self, "提示", "请输入要检查的 Query")
-            return
-        
-        panel.progress_label.setStyleSheet("color: #e6a23c;")
-        panel.progress_label.setText("正在评测...")
-        panel.verify_button.setEnabled(False)
-        
-        # 清空结果
-        panel.clear_result()
-        panel.append_result("🔍 开始评测 Query...")
-        
-        # 创建并启动 worker
-        self.query_verify_worker = QueryVerifyWorker(
-            query=query,
-            api_key=api_key,
-            api_base=panel.get_api_base(),
-            model_id=panel.get_model()
-        )
-        self.query_verify_worker.progress.connect(lambda msg: panel.append_result(msg))
-        self.query_verify_worker.finished.connect(self.on_query_verify_finished)
-        self.query_verify_worker.error.connect(self.on_query_verify_error)
-        self.query_verify_worker.start()
-    
-    def on_query_verify_finished(self, result: dict):
-        """Query 评测完成回调"""
-        panel = self.query_verify_panel
-        if not panel:
-            return
-        
-        # 格式化结果
-        output = "\n" + "=" * 60 + "\n"
-        output += "【评测结果】\n"
-        output += f"Query: {result['query']}\n\n"
-        output += f"1. 业务场景判断: {'是' if result['is_real_business_scenario'] else '否'}\n"
-        output += f"   说明: {result['business_reason']}\n\n"
-        
-        if result['product_category']:
-            output += f"2. 产品分类: {result['product_category']}\n"
-            output += f"3. 能力边界: {'在范围内' if result['within_ability_scope'] else '超出范围'}\n"
-            output += f"   说明: {result['ability_reason']}\n\n"
-        
-        output += f"最终结论: {result['final_result']}\n"
-        output += f"详细说明: {result['reason']}\n"
-        output += "=" * 60 + "\n"
-        
-        panel.append_result(output)
-        panel.progress_label.setStyleSheet("color: #67c23a;")
-        panel.progress_label.setText("✓ 评测完成")
-        panel.verify_button.setEnabled(True)
-    
-    def on_query_verify_error(self, error_msg: str):
-        """Query 评测错误回调"""
-        panel = self.query_verify_panel
-        if not panel:
-            return
-        
-        panel.append_result(f"\n❌ {error_msg}")
-        panel.progress_label.setStyleSheet("color: #f56c6c;")
-        panel.progress_label.setText("评测失败")
-        panel.verify_button.setEnabled(True)
     
     def on_manual_info_link_clicked(self, link):
         if link == "help:token":

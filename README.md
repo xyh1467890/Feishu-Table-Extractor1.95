@@ -1,22 +1,20 @@
 # 飞书多维表格数据管理工具
 
-一个基于 PyQt5 的图形界面工具，用于获取飞书（Lark）多维表格的完整数据，包括表结构、字段配置、记录内容、仪表盘、工作流、高级权限和表单配置等，还支持 Query 合理性智能检查。
+一个基于 PyQt5 的图形界面工具，用于获取飞书（Lark）多维表格的完整数据，包括表结构、字段配置、记录内容、仪表盘、工作流、高级权限和表单配置等。
 
 ## 功能特性
 
-- **六大功能模块**：
+- **五大功能模块**：
   - 📊 数据表：获取表结构、字段配置和记录内容
   - 📈 仪表盘：提取仪表盘配置快照
   - 🔄 工作流：获取工作流配置信息
   - 🔐 高级权限：提取角色和权限配置
   - 📝 表单：提取表单配置和字段信息
-  - 🔍 Query 合理性检查：基于 LangGraph 的智能 Query 评测
 
 - **多种认证方式**：支持 Token、OAuth 和 Cookie 三种认证方式
 - **文本对比工具**：内置文本对比功能，支持并排显示差异
 - **JSON 导出**：所有获取结果可导出为 JSON 格式文件
 - **现代化界面**：飞书风格的简洁美观界面设计
-- **智能评测**：基于 LangGraph 的 Query 合理性自动评测
 
 ## 项目结构
 
@@ -36,7 +34,6 @@ table_meta_data/
 │   ├── table_panel.py               # 数据表面板
 │   ├── simple_panel.py              # 通用面板（仪表盘、工作流、表单）
 │   ├── permission_panel.py          # 高级权限面板
-│   ├── query_verify_panel.py        # Query 合理性检查面板
 │   ├── result_panel.py              # 结果显示面板
 │   ├── text_diff_dialog.py          # 文本对比对话框
 │   ├── search_logic.py              # 搜索功能逻辑
@@ -45,31 +42,15 @@ table_meta_data/
 │   ├── __init__.py
 │   ├── oauth_worker.py              # OAuth 认证线程
 │   ├── cookie_worker.py             # Cookie 获取线程
-│   ├── fetch_worker.py              # 数据获取线程
-│   └── query_verify_worker.py       # Query 评测工作线程
-├── api/                             # API 接口模块
-│   ├── __init__.py
-│   ├── feishu_api.py                # 开放 API 接口（数据表）
-│   ├── feishu_cookie_api.py         # Cookie 方式接口
-│   ├── feishu_dashboard_api.py      # 仪表盘接口
-│   ├── feishu_workflow_api.py       # 工作流接口
-│   ├── feishu_permission_api.py     # 高级权限接口
-│   └── feishu_form_api.py           # 表单接口
-└── query_validity_Checkfeishu/      # Query 评测模块（基于 LangGraph）
-    ├── core/
-    │   ├── __init__.py
-    │   └── query_evaluator.py       # LangGraph 评测逻辑
-    ├── prompts/                     # Prompt 模板
-    │   ├── __init__.py
-    │   ├── business_reasoning_prompt.py
-    │   ├── product_classification_prompt.py
-    │   ├── multidimensional_table_prompt.py
-    │   ├── dashboard_prompt.py
-    │   ├── workflow_prompt.py
-    │   ├── advanced_permission_prompt.py
-    │   └── comprehensive_evaluation_prompt.py
-    ├── main.py                      # 命令行入口
-    └── flowchart.html               # 流程图
+│   └── fetch_worker.py              # 数据获取线程
+└── api/                             # API 接口模块
+    ├── __init__.py
+    ├── feishu_api.py                # 开放 API 接口（数据表）
+    ├── feishu_cookie_api.py         # Cookie 方式接口
+    ├── feishu_dashboard_api.py      # 仪表盘接口
+    ├── feishu_workflow_api.py       # 工作流接口
+    ├── feishu_permission_api.py     # 高级权限接口
+    └── feishu_form_api.py           # 表单接口
 ```
 
 ## 安装依赖
@@ -80,18 +61,11 @@ pip install -r requirements.txt
 
 ## 依赖说明
 
-### 基础依赖
 - `requests` - HTTP 请求库，用于 API 调用
 - `PyQt5` - 图形界面框架
 - `selenium` - 浏览器自动化工具（Cookie 方式自动获取时需要）
 - `webdriver-manager` - 自动管理浏览器驱动
 - `pyinstaller` - 打包工具
-
-### LangGraph 评测依赖
-- `langgraph==0.2.45` - LangGraph 工作流框架
-- `langchain==0.3.14` - LangChain 基础库
-- `langchain-ark==0.1.5` - 火山引擎 Ark 模型集成
-- `volcengine-python-sdk[ark]` - 火山引擎 Python SDK
 
 ## 使用方法
 
@@ -109,7 +83,6 @@ python main.py
 - 🔄 工作流
 - 🔐 高级权限
 - 📝 表单
-- 🔍 Query 合理性
 
 ### 3. 配置认证
 
@@ -141,17 +114,6 @@ python main.py
 2. 使用 Cookie 方式认证
 3. 点击"获取仪表盘snapshot"、"获取工作流数据"或"获取表单数据"
 
-#### Query 合理性检查
-1. 输入火山引擎 API Key（必填）
-2. （可选）输入自定义 API Base
-3. 输入要检查的 Query
-4. 点击"开始检查"
-5. 系统会通过 LangGraph 进行完整评测：
-   - 业务背景合理性判断
-   - 产品能力分类
-   - 能力边界判断
-   - 综合评测结果
-
 ### 5. 文本对比功能
 
 点击右上角的"📄 文本对比"按钮：
@@ -182,9 +144,6 @@ A: 这是正常现象，表示该多维表格没有配置对应的功能。
 **Q: 文本对比时文字显示不全？**
 A: 文本编辑框支持滚动查看所有内容，两侧内容会同步滚动。
 
-**Q: Query 评测失败提示 AccessDenied？**
-A: 请确认 API Key 有访问火山引擎 Ark 模型的权限，或检查模型 ID 是否正确。
-
 ## 打包成应用
 
 使用提供的 `build.bat` 脚本可以将程序打包成独立的可执行文件：
@@ -201,8 +160,6 @@ build.bat
 - **HTTP 请求**: requests
 - **浏览器自动化**: Selenium
 - **数据解析**: JSON, Base64, GZip
-- **LLM 工作流**: LangGraph
-- **模型集成**: LangChain + Ark (火山引擎)
 - **打包工具**: PyInstaller
 
 ## 许可证

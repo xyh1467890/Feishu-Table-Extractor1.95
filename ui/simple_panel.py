@@ -2,9 +2,11 @@ import sys
 import os
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QFrame
+    QFrame, QMessageBox
 )
 from PyQt5.QtCore import Qt
+
+from ui.batch_dialog import BatchExtractDialog
 
 
 def resource_path(relative_path):
@@ -133,7 +135,9 @@ class SimplePanel(QWidget):
         
         layout.addStretch()
         
-        # Action Button
+        # Action Buttons
+        btn_layout = QHBoxLayout()
+        
         if self.module_name == "仪表盘":
             self.fetch_button = QPushButton("获取仪表盘snapshot")
         else:
@@ -141,9 +145,43 @@ class SimplePanel(QWidget):
         self.fetch_button.setObjectName("primary_btn")
         self.fetch_button.setCursor(Qt.PointingHandCursor)
         self.fetch_button.clicked.connect(self.parent_window.fetch_data if self.parent_window else lambda: None)
-        layout.addWidget(self.fetch_button)
+        
+        self.batch_button = QPushButton("📦 批量提取")
+        self.batch_button.setObjectName("secondary_btn")
+        self.batch_button.setCursor(Qt.PointingHandCursor)
+        self.batch_button.clicked.connect(self.open_batch_dialog)
+        
+        btn_layout.addWidget(self.fetch_button)
+        btn_layout.addWidget(self.batch_button)
+        layout.addLayout(btn_layout)
         
         self.progress_label = QLabel("")
         self.progress_label.setAlignment(Qt.AlignCenter)
         self.progress_label.setStyleSheet("color: #67c23a; font-size: 13px; font-weight: bold; margin-top: 5px;")
         layout.addWidget(self.progress_label)
+    
+    def open_batch_dialog(self):
+        """打开批量提取对话框"""
+        # 获取当前认证信息（SimplePanel只有Cookie）
+        cookie = self.cookie_input.text().strip()
+        if not cookie:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "提示", "请先配置Cookie")
+            return
+        
+        # 将module_name转换为module_type
+        module_type_map = {
+            "仪表盘": "dashboard",
+            "工作流": "workflow",
+            "表单": "form"
+        }
+        module_type = module_type_map.get(self.module_name)
+        
+        if not module_type:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "提示", "未知的模块类型")
+            return
+        
+        # 打开对话框
+        dialog = BatchExtractDialog("cookie", cookie, module_type, self)
+        dialog.exec_()

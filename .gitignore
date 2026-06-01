@@ -41,5 +41,19 @@ build/
 .DS_Store
 Thumbs.db
 
+# Test scripts
+test_import.py
+check_import.py
+build.py
+input.csv
+old_main_window.py
+
+# Build files
+build.spec
+BUILD_README.md
+
 # Large files (if needed)
 get_user_access_token.mp4
+*.mp4
+*.avi
+*.mov
