@@ -57,3 +57,6 @@ get_user_access_token.mp4
 *.mp4
 *.avi
 *.mov
+
+# User config (contains API keys)
+config/user_config.json

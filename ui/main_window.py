@@ -7,7 +7,7 @@ import subprocess
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, 
     QTabWidget, QFileDialog, QMessageBox, QLineEdit, QLabel, QFrame,
-    QStackedWidget, QPushButton
+    QStackedWidget, QPushButton, QSizePolicy
 )
 from ui.text_diff_dialog import TextDiffDialog
 from PyQt5.QtCore import Qt
@@ -19,6 +19,7 @@ from ui.simple_panel import SimplePanel
 from ui.permission_panel import PermissionPanel
 from ui.result_panel import ResultPanel
 from ui.search_logic import SearchLogic
+from ui.building_ui.building_judge_panel import BuildingJudgePanel
 from workers.oauth_worker import OAuthTokenThread
 from workers.cookie_worker import GetCookieThread
 from workers.fetch_worker import FetchDataThread
@@ -28,7 +29,7 @@ class FeishuBitableApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("飞书多维表格数据管理工具")
-        self.resize(1300, 850)
+        self.resize(1300, 900)
         self.setMinimumSize(1100, 700)
         
         self.current_module = "table"
@@ -44,6 +45,7 @@ class FeishuBitableApp(QMainWindow):
         self.workflow_panel = None
         self.permission_panel = None
         self.form_panel = None
+        self.building_judge_panel = None
         self.result_panel = None
         self.search_logic = None
         
@@ -112,6 +114,7 @@ class FeishuBitableApp(QMainWindow):
         self.create_nav_button(module_layout, "🔄", "工作流", "workflow")
         self.create_nav_button(module_layout, "🔐", "高级权限", "permission")
         self.create_nav_button(module_layout, "📝", "表单", "form")
+        self.create_nav_button(module_layout, "🏗️", "Building机评", "building_judge")
         
         module_layout.addStretch()
         nav_layout.addWidget(self.module_nav)
@@ -166,7 +169,8 @@ class FeishuBitableApp(QMainWindow):
             "dashboard": "📈 仪表盘",
             "workflow": "🔄 工作流",
             "permission": "🔐 高级权限",
-            "form": "📝 表单"
+            "form": "📝 表单",
+            "building_judge": "🏗️ Building机评"
         }
         self.module_title.setText(module_titles.get(module_id, "📊 数据表"))
         
@@ -176,12 +180,21 @@ class FeishuBitableApp(QMainWindow):
             "dashboard": 1,
             "workflow": 2,
             "permission": 3,
-            "form": 4
+            "form": 4,
+            "building_judge": 5
         }.get(module_id, 0)
         self.module_stack.setCurrentIndex(panel_index)
         self.result_panel.result_text.clear()
         self.current_result = None
         self.result_panel.export_button.setEnabled(False)
+        
+        # 对 Building 机评模块特殊处理：切换到单栏模式
+        if module_id == "building_judge":
+            self.mode_stack.setCurrentIndex(1)  # 切换到单栏模式
+        else:
+            self.mode_stack.setCurrentIndex(0)  # 切换到分栏模式
+            self.result_panel.show()
+            self.divider.show()
     
     def create_right_content(self):
         right_widget = QWidget()
@@ -214,17 +227,20 @@ class FeishuBitableApp(QMainWindow):
         
         layout.addWidget(header_bar)
         
-        # 内容区域（左面板 + 结果面板）
-        content_widget = QWidget()
-        content_layout = QHBoxLayout(content_widget)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(1)
+        # 创建两种布局模式的容器
+        self.mode_stack = QStackedWidget()
         
-        left_panel_container = QWidget()
-        left_panel_container.setObjectName("left_panel_container")
-        left_panel_container.setFixedWidth(400)
+        # --- 模式 0：普通分栏布局（给其他模块用） ---
+        normal_widget = QWidget()
+        normal_layout = QHBoxLayout(normal_widget)
+        normal_layout.setContentsMargins(0, 0, 0, 0)
+        normal_layout.setSpacing(1)
         
-        left_panel_layout = QVBoxLayout(left_panel_container)
+        self.left_panel_container = QWidget()
+        self.left_panel_container.setObjectName("left_panel_container")
+        self.left_panel_container.setFixedWidth(400)
+        
+        left_panel_layout = QVBoxLayout(self.left_panel_container)
         left_panel_layout.setContentsMargins(0, 0, 0, 0)
         
         self.module_stack = QStackedWidget()
@@ -234,25 +250,33 @@ class FeishuBitableApp(QMainWindow):
         self.workflow_panel = SimplePanel(self, "工作流")
         self.permission_panel = PermissionPanel(self)
         self.form_panel = SimplePanel(self, "表单")
+        self.building_judge_panel = BuildingJudgePanel(self)
         
         self.module_stack.addWidget(self.table_panel)
         self.module_stack.addWidget(self.dashboard_panel)
         self.module_stack.addWidget(self.workflow_panel)
         self.module_stack.addWidget(self.permission_panel)
         self.module_stack.addWidget(self.form_panel)
+        self.module_stack.addWidget(self.building_judge_panel)
         
         left_panel_layout.addWidget(self.module_stack)
-        content_layout.addWidget(left_panel_container)
+        normal_layout.addWidget(self.left_panel_container)
         
-        divider = QFrame()
-        divider.setFrameShape(QFrame.VLine)
-        divider.setObjectName("divider")
-        content_layout.addWidget(divider)
+        self.divider = QFrame()
+        self.divider.setFrameShape(QFrame.VLine)
+        self.divider.setObjectName("divider")
+        normal_layout.addWidget(self.divider)
         
         self.result_panel = ResultPanel(self)
-        content_layout.addWidget(self.result_panel, 1)
+        normal_layout.addWidget(self.result_panel, 1)
         
-        layout.addWidget(content_widget, 1)
+        self.mode_stack.addWidget(normal_widget)
+        
+        # --- 模式 1：Building 机评单栏布局 ---
+        self.mode_stack.addWidget(self.building_judge_panel)
+        
+        # 添加到主布局
+        layout.addWidget(self.mode_stack, 1)
         
         self.search_logic = SearchLogic(
             self.result_panel.result_text,
@@ -272,6 +296,8 @@ class FeishuBitableApp(QMainWindow):
             return self.permission_panel
         elif self.current_module == "form":
             return self.form_panel
+        elif self.current_module == "building_judge":
+            return self.building_judge_panel
         return None
     
     def on_manual_info_link_clicked(self, link):

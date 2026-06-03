@@ -1,35 +1,56 @@
 # 飞书多维表格数据管理工具
 
-一个基于 PyQt5 的图形界面工具，用于获取飞书（Lark）多维表格的完整数据，包括表结构、字段配置、记录内容、仪表盘、工作流、高级权限和表单配置等。
+一个基于 PyQt5 的图形界面工具，用于获取飞书（Lark）多维表格的完整数据，包括表结构、字段配置、记录内容、仪表盘、工作流、高级权限和表单配置等，同时集成了 Building 机评功能。
 
-## 功能特性
+## ✨ 功能特性
 
-- **五大功能模块**：
-  - 📊 数据表：获取表结构、字段配置和记录内容
-  - 📈 仪表盘：提取仪表盘配置快照
-  - 🔄 工作流：获取工作流配置信息
-  - 🔐 高级权限：提取角色和权限配置
-  - 📝 表单：提取表单配置和字段信息
+### 📊 五大核心模块
+- **数据表**: 获取表结构、字段配置和记录内容
+- **仪表盘**: 提取仪表盘配置快照
+- **工作流**: 获取工作流配置信息
+- **高级权限**: 提取角色和权限配置
+- **表单**: 提取表单配置和字段信息
 
-- **多种认证方式**：支持 Token、OAuth 和 Cookie 三种认证方式
-- **文本对比工具**：内置文本对比功能，支持并排显示差异
-- **JSON 导出**：所有获取结果可导出为 JSON 格式文件
-- **现代化界面**：飞书风格的简洁美观界面设计
+### 🏗️ Building 机评功能
+- 支持单条用例测试和批量测试
+- 支持从 CSV/Excel 文件读取测试用例
+- 自动解析机评结果并生成多维表格报告
 
-## 项目结构
+### 🔐 多种认证方式
+- **Token 方式**（推荐，支持所有模块）
+- **OAuth 2.0 授权**（一键浏览器授权）
+- **Cookie 方式**（支持自动获取或手动输入）
+
+### 📄 附加功能
+- 内置文本对比工具，支持并排显示差异
+- 所有结果可导出为 JSON 格式文件
+- 现代化飞书风格界面设计
+
+## 📁 项目结构
 
 ```
-table_meta_data/
+base_mrtadata/
 ├── main.py                          # 程序主入口
 ├── icon.ico / icon.png              # 应用图标
-├── build.bat                        # 打包脚本
+├── build.bat                        # Windows 打包脚本
+├── build.sh                         # macOS/Linux 打包脚本
 ├── requirements.txt                 # 依赖包列表
+├── BUILDING_JUDGE_TUTORIAL.md       # Building 机评使用教程
 ├── config/                          # 配置模块
 │   ├── __init__.py
-│   └── settings.py                  # 配置参数
+│   ├── settings.py                  # 配置参数和 API Key 管理
+│   └── user_config.json             # 用户配置（自动生成）
+├── api/                             # API 接口模块
+│   ├── __init__.py
+│   ├── feishu_api.py                # 开放 API 接口（数据表）
+│   ├── feishu_cookie_api.py         # Cookie 方式接口
+│   ├── feishu_dashboard_api.py      # 仪表盘接口
+│   ├── feishu_workflow_api.py       # 工作流接口
+│   ├── feishu_permission_api.py     # 高级权限接口
+│   └── feishu_form_api.py           # 表单接口
 ├── ui/                              # 用户界面模块
 │   ├── __init__.py
-│   ├── styles.py                    # 界面样式
+│   ├── styles.py                    # 界面样式（飞书风格）
 │   ├── main_window.py               # 主窗口
 │   ├── table_panel.py               # 数据表面板
 │   ├── simple_panel.py              # 通用面板（仪表盘、工作流、表单）
@@ -37,56 +58,57 @@ table_meta_data/
 │   ├── result_panel.py              # 结果显示面板
 │   ├── text_diff_dialog.py          # 文本对比对话框
 │   ├── search_logic.py              # 搜索功能逻辑
-│   └── search_widget.py             # 搜索组件
+│   ├── search_widget.py             # 搜索组件
+│   └── building_ui/                 # Building 机评界面
+│       ├── __init__.py
+│       ├── building_judge_panel.py   # 机评主面板
+│       ├── batch_judge_dialog.py    # 批量测试对话框
+│       └── table_judge_panel.py     # 数据表机评面板
 ├── workers/                         # 后台工作线程
 │   ├── __init__.py
 │   ├── oauth_worker.py              # OAuth 认证线程
 │   ├── cookie_worker.py             # Cookie 获取线程
 │   └── fetch_worker.py              # 数据获取线程
-└── api/                             # API 接口模块
-    ├── __init__.py
-    ├── feishu_api.py                # 开放 API 接口（数据表）
-    ├── feishu_cookie_api.py         # Cookie 方式接口
-    ├── feishu_dashboard_api.py      # 仪表盘接口
-    ├── feishu_workflow_api.py       # 工作流接口
-    ├── feishu_permission_api.py     # 高级权限接口
-    └── feishu_form_api.py           # 表单接口
+└── building_spec/                   # Building 机评核心逻辑
+    ├── batch_judge.py               # 批量测试逻辑
+    ├── single_judge.py              # 单条测试逻辑
+    ├── dashboard_judge.py           # 仪表盘机评
+    └── feishu_bitable_import.py     # 结果导入多维表格脚本
 ```
 
-## 安装依赖
+## 🚀 快速开始
+
+### 环境要求
+- Python 3.8+
+- Windows / macOS / Linux
+
+### 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 依赖说明
-
-- `requests` - HTTP 请求库，用于 API 调用
-- `PyQt5` - 图形界面框架
-- `selenium` - 浏览器自动化工具（Cookie 方式自动获取时需要）
-- `webdriver-manager` - 自动管理浏览器驱动
-- `pyinstaller` - 打包工具
-
-## 使用方法
-
-### 1. 运行程序
+### 运行程序
 
 ```bash
 python main.py
 ```
 
-### 2. 选择功能模块
+## 📖 使用指南
+
+### 1. 选择功能模块
 
 左侧导航栏选择要使用的功能模块：
 - 📊 数据表
-- 📈 仪表盘
+- 📈 仪表盘  
 - 🔄 工作流
 - 🔐 高级权限
 - 📝 表单
+- 🏗️ Building机评
 
-### 3. 配置认证
+### 2. 配置认证
 
-#### Token 方式（推荐，支持所有模块）
+#### Token 方式（推荐）
 1. 打开飞书开放平台 API 调试台
 2. 获取 User Access Token
 3. 粘贴到 Token 输入框中
@@ -97,37 +119,59 @@ python main.py
 3. 输入 App ID 和 App Secret
 4. 点击"浏览器一键授权"进行 OAuth 认证
 
-#### Cookie 方式（用于仪表盘、工作流、表单）
-- **自动获取**：点击"启动浏览器"，在打开的浏览器中登录飞书后点击"已登录"
-- **手动输入**：从浏览器开发者工具中复制 Cookie 并粘贴
+#### Cookie 方式
+- **自动获取**: 点击"启动浏览器"，在打开的浏览器中登录飞书后点击"已登录"
+- **手动输入**: 从浏览器开发者工具中复制 Cookie 并粘贴
 
-### 4. 获取数据
+### 3. 获取数据
 
 #### 数据表
 1. 输入飞书多维表格链接
 2. （可选）勾选是否需要获取记录内容
-3. 选择认证方式（Token/OAuth/Cookie）并配置
+3. 选择认证方式并配置
 4. 点击"获取数据"
 
 #### 仪表盘/工作流/表单
-1. 输入对应链接（表单链接格式：`https://bytedance.larkoffice.com/share/base/form/...`）
+1. 输入对应链接
 2. 使用 Cookie 方式认证
-3. 点击"获取仪表盘snapshot"、"获取工作流数据"或"获取表单数据"
+3. 点击对应的获取按钮
 
-### 5. 文本对比功能
+#### Building 机评
+1. 配置 JUDGE_API_KEY（在机评界面中设置）
+2. 选择单条测试或批量测试
+3. 输入测试用例或选择测试文件（CSV/Excel）
+4. 点击"开始测试"
+
+### 4. 文本对比功能
 
 点击右上角的"📄 文本对比"按钮：
 - 在左右两个编辑框中分别输入要对比的文本
 - 点击"开始对比"查看差异
 - 一致内容显示绿色背景，不一致内容显示红色背景
 - 支持交换文本和清空功能
-- 可导出 JSON 结果
 
-### 6. 导出结果
+### 5. 导出结果
 
 获取成功后，可点击"导出 JSON"按钮将结果保存到本地。
 
-## 常见问题
+## 🔧 打包成应用
+
+### Windows 系统
+
+```cmd
+build.bat
+```
+
+### macOS / Linux 系统
+
+```bash
+chmod +x build.sh
+./build.sh
+```
+
+打包完成后，可执行文件位于 `dist/` 目录下。
+
+## 💡 常见问题
 
 **Q: 获取失败提示权限不足？**
 A: 请确保你的账号对该多维表格有访问权限，Token 或 OAuth 认证信息正确有效。
@@ -144,24 +188,25 @@ A: 这是正常现象，表示该多维表格没有配置对应的功能。
 **Q: 文本对比时文字显示不全？**
 A: 文本编辑框支持滚动查看所有内容，两侧内容会同步滚动。
 
-## 打包成应用
+**Q: macOS 上运行被阻止？**
+A: 请在「系统设置 → 隐私与安全性」中允许运行。
 
-使用提供的 `build.bat` 脚本可以将程序打包成独立的可执行文件：
-
-```bash
-build.bat
-```
-
-打包完成后，可执行文件位于 `dist/` 目录下。
-
-## 技术栈
+## 🛠️ 技术栈
 
 - **GUI 框架**: PyQt5
 - **HTTP 请求**: requests
-- **浏览器自动化**: Selenium
+- **浏览器自动化**: Selenium + webdriver-manager
 - **数据解析**: JSON, Base64, GZip
 - **打包工具**: PyInstaller
 
-## 许可证
+## 📄 许可证
 
 MIT License
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 📧 联系方式
+
+如果有问题或建议，欢迎通过飞书联系作者：[点击添加联系人](https://www.larkoffice.com/invitation/page/add_contact/?token=6e2ma113-ab71-48a6-a684-2c8bb2e38e32)

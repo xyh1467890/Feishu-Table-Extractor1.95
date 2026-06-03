@@ -46,7 +46,14 @@ class GetCookieThread(QThread):
                     driver = webdriver.Chrome(options=chrome_options)
                 except Exception as e2:
                     # 方案3: 提示用户手动处理
-                    error_msg = f"无法启动浏览器。请尝试：\n1. 关闭所有 Chrome 窗口\n2. 删除文件夹: C:\\Users\\{os.environ.get('USERNAME', '')}\\.wdm\n3. 重新运行程序\n\n错误: {str(e1)}"
+                    # 跨平台处理 .wdm 文件夹路径
+                    import platform
+                    if platform.system() == "Windows":
+                        wdm_path = f"C:\\Users\\{os.environ.get('USERNAME', '')}\\.wdm"
+                    else:
+                        # macOS 和 Linux
+                        wdm_path = os.path.join(os.path.expanduser("~"), ".wdm")
+                    error_msg = f"无法启动浏览器。请尝试：\n1. 关闭所有 Chrome 窗口\n2. 删除文件夹: {wdm_path}\n3. 重新运行程序\n\n错误: {str(e1)}"
                     self.error.emit(error_msg)
                     return
             
